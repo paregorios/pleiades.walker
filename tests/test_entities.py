@@ -46,11 +46,18 @@ class Test_Entities(TestCase):
         d = {'@type': 'Knuckle'}
         Place(d)
 
-    def test_place(self):
+    def test_place_load(self):
         fn = abspath(realpath(join(self.place_json_path, '1/0/1000.json')))
         with open(fn, 'r', encoding='utf-8') as f:
             j = json.load(f)
         del f
         p = Place(j)
         assert_equal(p.data['@type'], 'Place')
-
+        assert_equal(
+            sorted(list(p.data.keys())),
+            sorted(
+                ['@type', 'bbox', 'connectsWith', 'contributors', 'created',
+                    'creators', 'description', 'details', 'features',
+                    'history', 'id', 'locations', 'names', 'placeTypes',
+                    'provenance', 'references', 'reprPoint', 'review_state',
+                    'rights', 'subject', 'title', 'type', 'uri']))
