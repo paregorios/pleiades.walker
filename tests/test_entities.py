@@ -6,7 +6,7 @@ import json
 import logging
 from nose.tools import assert_equal, assert_false, assert_is_none, assert_true, raises
 from os.path import abspath, join, realpath
-from pleiades.walker import Place
+from pleiades.walker import Place, PlaceCollection
 from unittest import TestCase
 
 logger = logging.getLogger(__name__)
@@ -61,3 +61,31 @@ class Test_Entities(TestCase):
                     'history', 'id', 'locations', 'names', 'placeTypes',
                     'provenance', 'references', 'reprPoint', 'review_state',
                     'rights', 'subject', 'title', 'type', 'uri']))
+
+    def test_place_collection_empty(self):
+        PlaceCollection()
+
+    def test_place_collection_dict(self):
+        d = {
+            '@type': 'Place',
+            'id': '12345'
+        }
+        PlaceCollection([d])
+
+    def test_place_collection_place(self):
+        p = Place({'@type': 'Place', 'id': '12345'})
+        PlaceCollection([p])
+
+    def test_place_collection_add_dict(self):
+        pc = PlaceCollection()
+        pc.add_place({'@type': 'Place', 'id': '12345'})
+        assert_equal(len(pc.places), 1)
+
+    def test_place_collection_add_place(self):
+        pc = PlaceCollection()
+        pc.add_place(Place({'@type': 'Place', 'id': '12345'}))
+        assert_equal(len(pc.places), 1)
+
+    @raises(ValueError)
+    def test_place_collection_add_bad(self):
+        PlaceCollection('Heidelberg')
