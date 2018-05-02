@@ -68,22 +68,39 @@ class Test_Entities(TestCase):
     def test_place_collection_dict(self):
         d = {
             '@type': 'Place',
-            'id': '12345'
+            'id': '12345',
+            'title': 'Unobtainium',
+            'names': []
         }
         PlaceCollection([d])
 
     def test_place_collection_place(self):
-        p = Place({'@type': 'Place', 'id': '12345'})
+        p = Place({
+            '@type': 'Place',
+            'id': '12345',
+            'title': 'Unobtainium',
+            'names': []
+        })
         PlaceCollection([p])
 
     def test_place_collection_add_dict(self):
         pc = PlaceCollection()
-        pc.add_place({'@type': 'Place', 'id': '12345'})
+        pc.add_place({
+            '@type': 'Place',
+            'id': '12345',
+            'title': 'Unobtainium',
+            'names': []
+        })
         assert_equal(len(pc.places), 1)
 
     def test_place_collection_add_place(self):
         pc = PlaceCollection()
-        pc.add_place(Place({'@type': 'Place', 'id': '12345'}))
+        pc.add_place(Place({
+            '@type': 'Place',
+            'id': '12345',
+            'title': 'Unobtainium',
+            'names': []
+        }))
         assert_equal(len(pc.places), 1)
 
     @raises(ValueError)

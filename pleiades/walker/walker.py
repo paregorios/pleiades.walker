@@ -6,6 +6,7 @@ import logging
 import json
 from os import walk
 from os.path import abspath, isdir, join, realpath, splitext
+from pleiades.walker import PlaceCollection
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class Walker():
     def walk(self, count=True):
         if count:
             self.count = 0
+        results = None
         for root, dirs, files in walk(self.path):
             logger.debug('at {}: {}'.format(root, repr(files)))
             if len(self.extensions) > 0:
@@ -58,7 +60,11 @@ class Walker():
             data = self._load(root, select_files)
             data = self._clean(data)
             result = self._do(data)
-        return (self.count, result)
+            if results is None:
+                results = result
+            else:
+                results += result
+        return (self.count, results)
 
     def _load(self, root, filenames):
         """Perform some action on files at a directory node."""
@@ -96,3 +102,16 @@ class JsonWalker(Walker):
             del f
         return data
 
+
+class PleiadesWalker(JsonWalker):
+    """A class to crawl a hierarchical directory of Pleiades JSON files.
+    """
+
+    def __init__(self, path):
+        super().__init__(path=path)
+
+    def _do(self, data: list):
+        pc = PlaceCollection()
+        for datum in data:
+            pc.add_place(datum)
+        return pc
