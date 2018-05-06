@@ -96,3 +96,8 @@ class Test_Indexing(TestCase):
     def test_name_index(self):
         tokens = sorted(list(self.pc.indices['name'].keys()))
         assert_equal(['actania', 'germaniasuperior'], tokens)
+
+    def test_by_last_modified(self):
+        places = self.pc.get('last_modified')
+        assert_equal(len(places), 1)
+        assert_equal(places[0].data['id'], '200084')

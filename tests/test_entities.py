@@ -14,6 +14,22 @@ test_data_path = ['tests', 'data']
 place_json_path = test_data_path
 place_json_path.append('place_json')
 
+test_d = {
+    '@type': 'Place',
+    'id': '12345',
+    'title': 'Unobtainium',
+    'names': [],
+    'locations': [],
+    'created': '1981-07-30T20:30:00Z',
+    'history': [
+        {
+            "comment": "Created",
+            "modified": "1981-07-30T20:30:00Z",
+            "modifiedBy": "thomase"
+        }
+    ]
+}
+
 
 def setup_module():
     """Module-level setup steps for all place_crawler tests."""
@@ -66,41 +82,20 @@ class Test_Entities(TestCase):
         PlaceCollection()
 
     def test_place_collection_dict(self):
-        d = {
-            '@type': 'Place',
-            'id': '12345',
-            'title': 'Unobtainium',
-            'names': []
-        }
-        PlaceCollection([d])
+        PlaceCollection([test_d])
 
     def test_place_collection_place(self):
-        p = Place({
-            '@type': 'Place',
-            'id': '12345',
-            'title': 'Unobtainium',
-            'names': []
-        })
+        p = Place(test_d)
         PlaceCollection([p])
 
     def test_place_collection_add_dict(self):
         pc = PlaceCollection()
-        pc.add_place({
-            '@type': 'Place',
-            'id': '12345',
-            'title': 'Unobtainium',
-            'names': []
-        })
+        pc.add_place(test_d)
         assert_equal(len(pc.places), 1)
 
     def test_place_collection_add_place(self):
         pc = PlaceCollection()
-        pc.add_place(Place({
-            '@type': 'Place',
-            'id': '12345',
-            'title': 'Unobtainium',
-            'names': []
-        }))
+        pc.add_place(Place(test_d))
         assert_equal(len(pc.places), 1)
 
     @raises(ValueError)

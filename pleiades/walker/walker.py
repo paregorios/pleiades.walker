@@ -6,7 +6,7 @@ import logging
 import json
 from os import walk
 from os.path import abspath, isdir, join, realpath, splitext
-from pleiades.walker import PlaceCollection
+from pleiades.walker.entities import PlaceCollection
 
 logger = logging.getLogger(__name__)
 
@@ -47,14 +47,14 @@ class Walker():
             self.count = 0
         results = None
         for root, dirs, files in walk(self.path):
-            logger.debug('at {}: {}'.format(root, repr(files)))
+            # logger.debug('at {}: {}'.format(root, repr(files)))
             if len(self.extensions) > 0:
                 select_files = [
                     f for f in files if splitext(f)[1].lower()
                     in self.extensions]
             else:
                 select_files = files
-            logger.debug('selected files: {}'.format(sorted(select_files)))
+            # logger.debug('selected files: {}'.format(sorted(select_files)))
             if count:
                 self.count += len(select_files)
             data = self._load(root, select_files)

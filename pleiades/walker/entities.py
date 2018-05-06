@@ -6,7 +6,9 @@ Python 3 script template (changeme)
 
 import better_exceptions
 from copy import deepcopy
+import dateutil.parser
 import logging
+from pprint import pformat
 import unicodedata
 import unidecode
 import sys
@@ -32,14 +34,26 @@ class Place():
                     '"@type" attribute` passed to Place constructor had '
                     'unexpected value = "{}". Expected "Place".'
                     ''.format(e_type))
-        self.data = deepcopy(attributes)
+        self.data = attributes
+
+    def __str__(self):
+        return """https://pleiades.stoa.org/places/{id}
+{title}
+{description}
+""".format(**self.data)
 
 
 class PlaceCollection():
 
     def __init__(self, place_list=[]):
         self.places = []
-        self.indices = {}
+        self.indices = {
+            'id': {},
+            'name': {},
+            'modified': {},
+            'words': {}
+        }
+        self.most_recent = '19700101'
         for place in place_list:
             self.add_place(place)
 
@@ -52,35 +66,35 @@ class PlaceCollection():
             raise ValueError(
                 'Unexpected argument type for PlaceCollection.add_place(): '
                 '"{}". Expected "Place" or "dict".'.format(type(place)))
-        index_titles = ['id', 'name']
+        index_titles = [k for k in self.indices.keys() if k != 'words']
         for it in index_titles:
-            try:
-                self.indices[it]
-            except KeyError:
-                self.indices[it] = {}
-            finally:
-                self._index(it, self.places[-1])
+            self._index(it, self.places[-1])
 
-    def _index(self, it, place):
-        logger.debug('index {}'.format(it))
+    def _index(self, it, place=None):
+        # logger.debug('index {}'.format(it))
         index = self.indices[it]
         if it == 'id':
             index[place.data['id']] = place
-            logger.debug(index)
+            # logger.debug(index)
         else:
-            getattr(self, '_do_index_{}'.format(it))(place)
+            if place is not None:
+                getattr(self, '_do_index_{}'.format(it))(place)
+            else:
+                getattr(self, '_do_index_{}'.format(it))()
 
     def _do_index_name(self, place):
         index = self.indices['name']
-        tokens = place.data['title'].split('/')
+        names = place.data['title'].split('/')
         for name in place.data['names']:
-            tokens.append(name['attested'])
-            tokens.extend(name['romanized'].split(','))
-        tokens = [t.strip() for t in tokens if t.strip() != '']
-        tokens = [self._tokenize(t) for t in tokens]
+            if name['attested'] is not None:
+                names.append(name['attested'])
+            names.extend(name['romanized'].split(','))
+        names = [n.strip() for n in names if n is not None and n.strip() != '']
+        tokens = [self._tokenize(n) for n in names]
         tokens = list(set(tokens))
         tokens = [t for t in tokens if not (
             t.startswith('untitled') or t.startswith('unnamed'))]
+        pid = place.data['id']
         for token in tokens:
             try:
                 entry = index[token]
@@ -88,13 +102,97 @@ class PlaceCollection():
                 index[token] = []
                 entry = index[token]
             finally:
-                entry.append(place.data['id'])
+                if pid not in entry:
+                    entry.append(pid)
+            self._do_index_words(names, pid)
+
+    def _do_index_words(self, names: list, pid: str):
+        index = self.indices['words']
+        words = []
+        for name in names:
+            name_parts = name.split()
+            if len(name_parts) > 1:
+                words.extend(name_parts)
+        words = [w.strip() for w in words if w is not None and w.strip() != '']
+        tokens = [self._tokenize(w) for w in words]
+        tokens = list(set(tokens))
+        tokens = [t for t in tokens if t not in ['untitled', 'unnamed']]
+        for token in tokens:
+            try:
+                entry = index[token]
+            except KeyError:
+                index[token] = []
+                entry = index[token]
+            finally:
+                if pid not in entry:
+                    entry.append(pid)
+
+    def _do_index_modified(self, place):
+        index = self.indices['modified']
+        stamps = [place.data['created']]
+        for event in place.data['history']:
+            stamps.append(event['modified'])
+        for location in place.data['locations']:
+            stamps.append(location['created'])
+            for event in location['history']:
+                stamps.append(event['modified'])
+        for name in place.data['names']:
+            stamps.append(name['created'])
+            for event in name['history']:
+                stamps.append(event['modified'])
+        stamps = list(set(stamps))
+        stamps = sorted(stamps, reverse=True)
+        try:
+            latest = dateutil.parser.parse(stamps[0]).strftime('%Y%m%d')
+        except TypeError:
+            logger.critical(pformat(place.data))
+            raise
+        if latest > self.most_recent:
+            self.most_recent = latest
+        try:
+            index[latest]
+        except KeyError:
+            index[latest] = []
+        finally:
+            pid = place.data['id']
+            if pid not in index[latest]:
+                index[latest].append(pid)
+
+    def _get_index_last_modified(self):
+        date_index = self.indices['modified']
+        pid_index = self.indices['id']
+        return [pid_index[pid] for pid in date_index[self.most_recent]]
 
     def _get_index_name(self, value):
         name_index = self.indices['name']
         pid_index = self.indices['id']
         token = self._tokenize(value)
-        return [pid_index[pid] for pid in name_index[token]]
+        try:
+            pids = name_index[token]
+        except KeyError:
+            return []
+        return [pid_index[pid] for pid in pids]
+
+    def _get_index_in_name(self, value):
+        word_index = self.indices['words']
+        logger.debug(
+            'word index contains {} unique terms'.format(len(word_index)))
+        pid_index = self.indices['id']
+        token = self._tokenize(value)
+        try:
+            pids = word_index[token]
+        except KeyError:
+            logger.debug('word index MISS for token="{}"'.format(token))
+            logger.debug(
+                'index term context: {}'.format(
+                    sorted(
+                        [w for w in word_index.keys() if w.startswith(
+                            token[0])])))
+            return []
+        else:
+            logger.debug('word index HIT for token="{}": {} results'.format(
+                token, len(pids)))
+        return [pid_index[pid] for pid in pids]
 
     def _tokenize(self, raw: str):
         cooked = raw.strip()
@@ -103,18 +201,25 @@ class PlaceCollection():
         cooked = ''.join(cooked.split()).lower()
         return cooked
 
-    def get(self, it, value):
+    def get(self, it, value=None):
         if it == 'id':
-            return [self.indices['id'][value]]
+            try:
+                result = self.indices['id'][value]
+            except KeyError:
+                return []
+            else:
+                return [result]
         else:
-            return getattr(self, '_get_index_{}'.format(it))(value)
+            if value is not None:
+                return getattr(self, '_get_index_{}'.format(it))(value)
+            else:
+                return getattr(self, '_get_index_{}'.format(it))()
 
     def __add__(self, *args):
         if len(args) == 0:
-            return deepcopy(self)
+            return self
         else:
-            result = deepcopy(self)
-            for pc in args:
+            for pc in [a for a in args if isinstance(a, PlaceCollection)]:
                 for p in pc.places:
-                    result.add_place(p)
-        return result
+                    self.add_place(p)
+        return self

@@ -8,11 +8,11 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 setup(
     name='pleiades.walker',
     version='0.1',
-    description='change me',
+    description='Walk through Pleiades JSON file directory tree.',
     long_description=long_description,
-    url='http://change.me',
-    author='Change Me',
-    author_email='change@me.org',
+    url='https://pleiades.stoa.org',
+    author='Tom Elliott',
+    author_email='ipse@paregorios.org',
     license='LICENSE.txt',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
@@ -35,7 +35,7 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    # install_requires=['peppercorn'],
+    install_requires=['better-exceptions', 'python-dateutil', 'unidecode'],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
