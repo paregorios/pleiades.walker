@@ -7,6 +7,7 @@ Python 3 script template (changeme)
 import better_exceptions
 from copy import deepcopy
 import dateutil.parser
+from itertools import permutations
 import logging
 from pprint import pformat
 import unicodedata
@@ -45,13 +46,14 @@ class Place():
 
 class PlaceCollection():
 
-    def __init__(self, place_list=[]):
+    def __init__(self, place_list=[], index_on_add=False):
         self.places = []
+        self.index_on_add = index_on_add
         self.indices = {
             'id': {},
             'name': {},
-            'modified': {},
-            'words': {}
+            'last_modified': {},
+            'in_name': {}
         }
         self.most_recent = '19700101'
         for place in place_list:
@@ -66,9 +68,10 @@ class PlaceCollection():
             raise ValueError(
                 'Unexpected argument type for PlaceCollection.add_place(): '
                 '"{}". Expected "Place" or "dict".'.format(type(place)))
-        index_titles = [k for k in self.indices.keys() if k != 'words']
-        for it in index_titles:
-            self._index(it, self.places[-1])
+        if self.index_on_add:
+            index_titles = [k for k in self.indices.keys() if k != 'words']
+            for it in index_titles:
+                self._index(it, self.places[-1])
 
     def _index(self, it, place=None):
         # logger.debug('index {}'.format(it))
@@ -104,17 +107,22 @@ class PlaceCollection():
             finally:
                 if pid not in entry:
                     entry.append(pid)
-            self._do_index_words(names, pid)
+            self._do_index_in_name(names, pid)
 
-    def _do_index_words(self, names: list, pid: str):
-        index = self.indices['words']
+    def _do_index_in_name(self, names: list, pid: str):
+        index = self.indices['in_name']
         words = []
         for name in names:
-            name_parts = name.split()
-            if len(name_parts) > 1:
-                words.extend(name_parts)
-        words = [w.strip() for w in words if w is not None and w.strip() != '']
-        tokens = [self._tokenize(w) for w in words]
+            if ' ' in name:
+                name_parts = [
+                    p for p in name.split()
+                    if p != '' and p[0] != p[0].lower()]
+                words.extend([' '.join(p) for p in name_parts])
+        try:
+            tokens = [self._tokenize(w) for w in words]
+        except AttributeError:
+            print(words)
+            raise
         tokens = list(set(tokens))
         tokens = [t for t in tokens if t not in ['untitled', 'unnamed']]
         for token in tokens:
@@ -127,8 +135,8 @@ class PlaceCollection():
                 if pid not in entry:
                     entry.append(pid)
 
-    def _do_index_modified(self, place):
-        index = self.indices['modified']
+    def _do_index_last_modified(self, place):
+        index = self.indices['last_modified']
         stamps = [place.data['created']]
         for event in place.data['history']:
             stamps.append(event['modified'])
@@ -159,7 +167,7 @@ class PlaceCollection():
                 index[latest].append(pid)
 
     def _get_index_last_modified(self):
-        date_index = self.indices['modified']
+        date_index = self.indices['last_modified']
         pid_index = self.indices['id']
         return [pid_index[pid] for pid in date_index[self.most_recent]]
 
@@ -174,7 +182,7 @@ class PlaceCollection():
         return [pid_index[pid] for pid in pids]
 
     def _get_index_in_name(self, value):
-        word_index = self.indices['words']
+        word_index = self.indices['in_name']
         logger.debug(
             'word index contains {} unique terms'.format(len(word_index)))
         pid_index = self.indices['id']
@@ -182,6 +190,8 @@ class PlaceCollection():
         try:
             pids = word_index[token]
         except KeyError:
+            if token == '':
+                raise
             logger.debug('word index MISS for token="{}"'.format(token))
             logger.debug(
                 'index term context: {}'.format(
@@ -202,6 +212,13 @@ class PlaceCollection():
         return cooked
 
     def get(self, it, value=None):
+        if len(self.indices['id']) == 0:
+            logger.info('Constructing pid index ...')
+            for place in self.places:
+                self._index('id', place)
+            logger.info(
+                '... pid indexing complete: {} entries'.format(
+                    len(self.indices['id'])))
         if it == 'id':
             try:
                 result = self.indices['id'][value]
@@ -210,6 +227,13 @@ class PlaceCollection():
             else:
                 return [result]
         else:
+            if len(self.indices[it]) == 0:
+                logger.info('Constructing {} index ...'.format(it))
+                for pid, place in self.indices['id'].items():
+                    self._index(it, place)
+                logger.info(
+                    '... {} indexing complete: {} entries'.format(
+                        it, len(self.indices[it])))
             if value is not None:
                 return getattr(self, '_get_index_{}'.format(it))(value)
             else:
